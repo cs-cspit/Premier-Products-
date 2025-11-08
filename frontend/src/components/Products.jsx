@@ -20,6 +20,8 @@ const Products = ({ isLoggedIn, onUpdateCartCount, showLogin, onOpenLogin, onClo
   });
   const location = useLocation();
   const [imageManifest, setImageManifest] = useState([]);
+  // Where the images live. If empty string, files are in public root
+  const [manifestBasePath, setManifestBasePath] = useState('/images/products/pressure-gauge-parts/premium');
   // Track manifest load (could be used for skeletons later); underscore prefix to bypass lint unused rule
   const [_manifestLoaded, setManifestLoaded] = useState(false);
 
@@ -74,10 +76,20 @@ const Products = ({ isLoggedIn, onUpdateCartCount, showLogin, onOpenLogin, onClo
   useEffect(() => {
     const loadManifest = async () => {
       try {
-        const res = await fetch('/images/products/pressure-gauge-parts/premium/manifest.json');
-        if (!res.ok) throw new Error('Failed to load image manifest');
-        const data = await res.json();
-        setImageManifest(Array.isArray(data) ? data : []);
+        // Try preferred location first
+        let res = await fetch('/images/products/pressure-gauge-parts/premium/manifest.json');
+        if (res.ok) {
+          const data = await res.json();
+          setImageManifest(Array.isArray(data) ? data : []);
+          setManifestBasePath('/images/products/pressure-gauge-parts/premium');
+        } else {
+          // Fallback to root manifest that lists images in public/
+          res = await fetch('/manifest.json');
+          if (!res.ok) throw new Error('Failed to load image manifest');
+          const data = await res.json();
+          setImageManifest(Array.isArray(data) ? data : []);
+          setManifestBasePath('');
+        }
       } catch (e) {
         console.warn('Image manifest load issue:', e.message);
       } finally {
@@ -103,12 +115,22 @@ const Products = ({ isLoggedIn, onUpdateCartCount, showLogin, onOpenLogin, onClo
 
   const getImageForProduct = (product, idx) => {
     // Simple deterministic assignment by index for reliability
-    if (!imageManifest.length) return 'https://via.placeholder.com/300x200?text=Product';
+    if (!imageManifest.length) return { src: 'https://via.placeholder.com/300x200?text=Product' };
     const assigned = imageManifest[idx % imageManifest.length];
-    return `/images/products/pressure-gauge-parts/premium/${encodeURIComponent(assigned)}`;
+    const base = manifestBasePath || '';
+    const primary = `${base ? base : ''}/${encodeURIComponent(assigned)}`.replace(/\/+/, '/');
+    // Provide an alternate guess to improve resilience when files are moved
+    const alt = `/images/${encodeURIComponent(assigned)}`;
+    return { src: primary, alt };
   };
 
   const handleImgError = (e) => {
+    const alt = e.currentTarget.dataset.alt;
+    if (alt) {
+      e.currentTarget.dataset.alt = '';
+      e.currentTarget.src = alt;
+      return;
+    }
     e.currentTarget.src = 'https://via.placeholder.com/300x200?text=Image+Not+Found';
     e.currentTarget.onerror = null; // prevent infinite loop
   };
@@ -341,13 +363,15 @@ const Products = ({ isLoggedIn, onUpdateCartCount, showLogin, onOpenLogin, onClo
                 className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
               >
                 <Link to={`/product/${product._id}`} className="block">
+                  {(() => { const img = getImageForProduct(product, idx); return (
                   <img
-                    src={getImageForProduct(product, idx)}
+                    src={img.src}
+                    data-alt={img.alt || ''}
                     alt={product.name}
                     onError={handleImgError}
                     loading="lazy"
                     className="w-full h-48 object-cover bg-gray-100"
-                  />
+                  />); })()}
                 </Link>
                 <div className="p-4">
                   <Link to={`/product/${product._id}`} className="block">

@@ -1,6 +1,7 @@
 import authService from './authService';
+import API_BASE_URL_ROOT from '../config/api';
 
-const API_BASE_URL = 'http://localhost:3004/api/users';
+const API_BASE_URL = `${API_BASE_URL_ROOT}/users`;
 
 const userService = {
   async updateProfile(updates) {

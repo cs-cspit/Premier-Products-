@@ -1,5 +1,7 @@
 // Authentication service for handling JWT tokens and API calls
-const API_BASE_URL = 'http://localhost:3004/api/users';
+import API_BASE_URL_ROOT from '../config/api';
+// Append users path; API config already includes /api base
+const API_BASE_URL = `${API_BASE_URL_ROOT}/users`;
 
 class AuthService {
   // Get token from localStorage

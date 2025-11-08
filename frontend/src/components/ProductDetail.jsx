@@ -30,13 +30,25 @@ const ProductDetail = ({ isLoggedIn, onUpdateCartCount }) => {
 
   // Local premium images manifest for fallback gallery
   const [imageManifest, setImageManifest] = useState([]);
+  const [manifestBasePath, setManifestBasePath] = useState('/images/products/pressure-gauge-parts/premium');
   useEffect(() => {
     const loadManifest = async () => {
       try {
-        const res = await fetch('/images/products/pressure-gauge-parts/premium/manifest.json');
-        if (!res.ok) throw new Error('Manifest fetch failed');
-        const data = await res.json();
-        if (Array.isArray(data)) setImageManifest(data);
+        // Preferred premium path
+        let res = await fetch('/images/products/pressure-gauge-parts/premium/manifest.json');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) setImageManifest(data);
+          setManifestBasePath('/images/products/pressure-gauge-parts/premium');
+        } else {
+          // Fallback to root manifest.json
+          res = await fetch('/manifest.json');
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) setImageManifest(data);
+            setManifestBasePath('');
+          }
+        }
       } catch (e) {
         console.warn('ProductDetail manifest load issue:', e.message);
       }
@@ -55,23 +67,34 @@ const ProductDetail = ({ isLoggedIn, onUpdateCartCount }) => {
   }, [imageManifest]);
 
   const chooseImage = () => {
-    if (!product) return '/placeholder.png';
-    if (product.image) return product.image;
-    if (!imageManifest.length) return '/placeholder.png';
+    if (!product) return { src: '/placeholder.png' };
+    if (product.image) return { src: product.image };
+    if (!imageManifest.length) return { src: '/placeholder.png' };
 
     const slug = slugify(product.name || '');
     if (filenameIndexBySlug[slug]) {
-      return `/images/products/pressure-gauge-parts/premium/${encodeURIComponent(filenameIndexBySlug[slug])}`;
+      const base = manifestBasePath || '';
+      const primary = `${base ? base : ''}/${encodeURIComponent(filenameIndexBySlug[slug])}`.replace(/\/+/, '/');
+      const alt = `/images/${encodeURIComponent(filenameIndexBySlug[slug])}`;
+      return { src: primary, alt };
     }
     const words = slug.split('-').filter(w => w.length > 2);
     const fuzzy = imageManifest.find(f => {
       const fslug = slugify(f.replace(/\.(avif|webp|jpe?g|png)$/i,''));
       return words.every(w => fslug.includes(w));
     });
-    if (fuzzy) return `/images/products/pressure-gauge-parts/premium/${encodeURIComponent(fuzzy)}`;
+    if (fuzzy) {
+      const base = manifestBasePath || '';
+      const primary = `${base ? base : ''}/${encodeURIComponent(fuzzy)}`.replace(/\/+/, '/');
+      const alt = `/images/${encodeURIComponent(fuzzy)}`;
+      return { src: primary, alt };
+    }
     // fallback random deterministic by hash
     const idx = Math.abs(slug.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % imageManifest.length;
-    return `/images/products/pressure-gauge-parts/premium/${encodeURIComponent(imageManifest[idx])}`;
+    const base = manifestBasePath || '';
+    const primary = `${base ? base : ''}/${encodeURIComponent(imageManifest[idx])}`.replace(/\/+/, '/');
+    const alt = `/images/${encodeURIComponent(imageManifest[idx])}`;
+    return { src: primary, alt };
   };
 
   const { addToast } = useNotification();
@@ -111,7 +134,24 @@ const ProductDetail = ({ isLoggedIn, onUpdateCartCount }) => {
     <div className="container mx-auto p-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
-          <img src={chooseImage()} alt={product.name} onError={(e)=>{e.currentTarget.src='https://via.placeholder.com/600x400?text=Image+Not+Found'; e.currentTarget.onerror=null;}} className="w-full object-cover rounded-md shadow bg-gray-100" />
+          {(() => { const img = chooseImage(); return (
+            <img
+              src={img.src}
+              data-alt={img.alt || ''}
+              alt={product.name}
+              onError={(e)=>{
+                const alt = e.currentTarget.dataset.alt;
+                if (alt) {
+                  e.currentTarget.dataset.alt = '';
+                  e.currentTarget.src = alt;
+                } else {
+                  e.currentTarget.src='https://via.placeholder.com/600x400?text=Image+Not+Found';
+                  e.currentTarget.onerror=null;
+                }
+              }}
+              className="w-full object-cover rounded-md shadow bg-gray-100"
+            />
+          ); })()}
         </div>
         <div>
           <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
