@@ -13,13 +13,25 @@ const contactRoutes = require("./routes/contactRoutes");
 
 const app = express();
 
-// CORS configuration for production
+// Enhanced CORS configuration (supports multiple comma-separated origins)
+const rawCorsOrigins = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = rawCorsOrigins.split(',').map(o => o.trim()).filter(Boolean);
+
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow non-browser requests or same-origin callbacks (like curl / server-side)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn('🚫 CORS blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
+console.log('🌐 Allowed CORS origins:', allowedOrigins);
 app.use(express.json());
 
 // Serve static files for uploads
