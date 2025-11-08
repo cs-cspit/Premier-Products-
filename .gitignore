@@ -133,7 +133,8 @@ dist/
 
 # Gatsby files (if used in future)
 .cache/
-public/
+# NOTE: Keeping Gatsby-style public/ ignore disabled for this project so we can commit frontend/public assets.
+# Removed 'public/' ignore entry.
 
 # Storybook build outputs (if used in future)
 .out/
